@@ -1,0 +1,51 @@
+name: Deploy Pages
+
+on:
+  push:
+    branches:
+      - gh-pages
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v6
+        with:
+          ref: gh-pages
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare publish tree
+        run: |
+          set -euo pipefail
+          publish_dir="$(mktemp -d)"
+          rsync -a --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            ./ "$publish_dir"/
+          rm -rf ./dist
+          cp -R "$publish_dir"/. ./dist/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./dist
+
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
